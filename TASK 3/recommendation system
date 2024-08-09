@@ -1,0 +1,73 @@
+import pandas as pd
+import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
+data = {
+    'User1': {'Movie1': 5, 'Movie2': 3, 'Movie3': 4},
+    'User2': {'Movie1': 4, 'Movie2': 5, 'Movie4': 2},
+    'User3': {'Movie1': 3, 'Movie4': 4, 'Movie5': 5},
+    'User4': {'Movie2': 4, 'Movie3': 4, 'Movie5': 3}
+}
+
+df = pd.DataFrame(data).fillna(0) 
+
+user_similarity = cosine_similarity(df.T)
+user_similarity_df = pd.DataFrame(user_similarity, index=df.columns, columns=df.columns)
+
+print("DataFrame columns (items):", df.columns)
+print("User similarity DataFrame indices:", user_similarity_df.index)
+print("User similarity DataFrame columns:", user_similarity_df.columns)
+
+def recommend(user_id, num_recommendations):
+    if user_id not in df.columns:
+        return "User not found."
+    
+    user_ratings = df[user_id]
+    similar_users = user_similarity_df[user_id]
+    
+    print(f"User ratings for {user_id}:", user_ratings)
+    print(f"Similar users for {user_id}:", similar_users)
+    
+    item_scores = pd.Series(index=df.columns, data=0.0)
+    for other_user in df.columns:
+        if other_user != user_id:
+            other_user_ratings = df[other_user]
+            for item in other_user_ratings.index:
+                if user_ratings[item] == 0:  
+                    if item in similar_users.index and item in other_user_ratings.index:
+                        item_scores[item] += similar_users[other_user] * other_user_ratings[item]
+    
+    print("Item scores:", item_scores)
+    
+    item_scores = item_scores.drop(user_ratings[user_ratings > 0].index, errors='ignore')
+    
+    recommendations = item_scores.nlargest(num_recommendations).index.tolist()
+    
+    return recommendations
+
+print("Collaborative Filtering Recommendations:")
+print(recommend('User1', 2))
+
+item_features = {
+    'Movie1': {'Action': 1, 'Comedy': 0, 'Drama': 0},
+    'Movie2': {'Action': 0, 'Comedy': 1, 'Drama': 0},
+    'Movie3': {'Action': 1, 'Comedy': 0, 'Drama': 1},
+    'Movie4': {'Action': 0, 'Comedy': 0, 'Drama': 1},
+    'Movie5': {'Action': 1, 'Comedy': 1, 'Drama': 0}
+}
+
+item_features_df = pd.DataFrame(item_features).T
+
+def recommend_content_based(user_preferences, num_recommendations):
+    user_preferences_df = pd.DataFrame([user_preferences], index=['user'])
+    
+    item_similarity = cosine_similarity(user_preferences_df, item_features_df)
+    
+    item_scores = pd.Series(item_similarity.flatten(), index=item_features_df.index)
+    
+    recommendations = item_scores.nlargest(num_recommendations).index.tolist()
+    
+    return recommendations
+
+user_preferences = {'Action': 1, 'Comedy': 0, 'Drama': 1}
+print("Content-Based Filtering Recommendations:")
+print(recommend_content_based(user_preferences, 2))
